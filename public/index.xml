@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Adam Ott</title>
+    <link>/</link>
+    <description>Recent content on Adam Ott</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Tue, 22 Dec 2020 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>A Bayesian Approach to Catcher Framing</title>
+      <link>/blog/a-bayesian-approach-to-catcher-framing/</link>
+      <pubDate>Tue, 22 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/a-bayesian-approach-to-catcher-framing/</guid>
+      <description>library(tidyverse)## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --## v ggplot2 3.3.2 v purrr 0.3.4## v tibble 3.0.4 v dplyr 1.0.2## v tidyr 1.1.2 v stringr 1.4.0## v readr 1.4.0 v forcats 0.5.0## Warning: package &amp;#39;tibble&amp;#39; was built under R version 4.0.3## Warning: package &amp;#39;tidyr&amp;#39; was built under R version 4.0.3## Warning: package &amp;#39;readr&amp;#39; was built under R version 4.0.3## -- Conflicts ------------------------------------------ tidyverse_conflicts() --## x dplyr::filter() masks stats::filter()## x dplyr::lag() masks stats::lag()library(doParallel)## Loading required package: foreach## ## Attaching package: &amp;#39;foreach&amp;#39;## The following objects are masked from &amp;#39;package:purrr&amp;#39;:## ## accumulate, when## Loading required package: iterators## Loading required package: parallellibrary(foreach)library(baseballr)## Registered S3 method overwritten by &amp;#39;quantmod&amp;#39;:## method from## as.</description>
+    </item>
+    
+    <item>
+      <title>Most Consecutive Years with a New Starter on Opening Day</title>
+      <link>/blog/most-consecutive-years-with-a-new-starter-on-opening-day/</link>
+      <pubDate>Thu, 17 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/most-consecutive-years-with-a-new-starter-on-opening-day/</guid>
+      <description>Throughout 2020, I have helped answer baseball research questions for the FanGraphs podcast “Effectively Wild.” Every couple of weeks, one of the hosts will reach out to be asking if I can find the answer to a baseball history question for a segment known as a “Stat Blast.” To answer the questions, I have largely used two databases: a Retrosheet database I have on my own laptop (set up using a tutorial from Bill Petti at https://billpetti.</description>
+    </item>
+    
+    <item>
+      <title>About</title>
+      <link>/about/</link>
+      <pubDate>Sun, 02 Oct 2016 22:55:05 -0400</pubDate>
+      
+      <guid>/about/</guid>
+      <description>I am a Statistics Master&amp;rsquo;s student at Brigham Young University. I enjoy sports, singing, and spending time with my family.
+I have previously interned as an Analyst at Energy Exemplar and a Data Scientist. Currently, I do research and work as a teaching assistant at BYU. I have also done research for &amp;ldquo;Effectively Wild&amp;rdquo;, a FanGraphs baseball podcast.</description>
+    </item>
+    
+  </channel>
+</rss>

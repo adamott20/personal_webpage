@@ -1,0 +1,215 @@
+---
+title: Most Consecutive Years with a New Starter on Opening Day
+author: ~
+date: '2020-12-17'
+slug: most-consecutive-years-with-a-new-starter-on-opening-day
+categories: []
+tags: []
+comments: no
+showcomments: yes
+showpagemeta: yes
+---
+
+Throughout 2020, I have helped answer baseball research questions for the FanGraphs podcast "Effectively Wild." Every couple of weeks, one of the hosts will reach out to be asking if I can find the answer to a baseball history question for a segment known as a "Stat Blast." To answer the questions, I have largely used two databases: a Retrosheet database I have on my own laptop (set up using a tutorial from Bill Petti at https://billpetti.github.io/2019-08-10-build-retrosheet-event-roster-database-rstats-baseballr/) and the Lahman database (which I access with the Lahman package in R). 
+
+This series shows how I use these databases along with R to answer these questions. Today, I show how I answered a question on the longest streaks for having a different starter at a position on opening day.
+
+The question was framed as the following:
+
+Since the Giants participated in the blackballing of Barry Bonds, they have not had the same opening day starting LF in consecutive years:
+
+* '08: Dave Roberts
+* '09: Fred Lewis
+* '10: Mark DeRosa
+* '11: Pat Burrell
+* '12: Aubrey Huff
+* '13: Andres Torres
+* '14: Michael Morse
+* '15: Nori Aoki
+* '16: Angel Pagan
+* '17: Jarrett Parker
+* '18: Hunter Pence
+* '19: Connor Joe
+
+2020, whenever it starts, (or 2021)  will be the 13th year without the same opening day starter at a position. Is this a record? If not, what is the record?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/R Fun/Baseball_Analysis")
+```
+
+
+To answer this question, I first read in the data from my retrosheet database. The file "dbcon.R" is a script that attaches to a PostgreSQL database and the dbGetQuery() function uses a SQL query to read the entire retro_games table into R. The retro_games table contains one row for each game in MLB history, with game information, including the lineup and positions for the starters, which I will use the answer the question.
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+source("dbcon.R")
+games <- dbGetQuery(con, 'select * from retro_games')
+```
+
+There is some data manipulation necessary to answer the question. First, I would like to have one row for each starting position for each game for each team, or 18 rows per game, rather than the one row per game that the data are currently structured as. The below commands do just that.
+
+```{r}
+away_players <- games %>%
+  mutate(date_use = as.numeric(substr(game_id, 4,12))) %>% 
+  select(date_use, year_id, team = visiting_team, visitor_batting1name,
+         visitor_batting2name,
+         visitor_batting3name,
+         visitor_batting4name,
+         visitor_batting5name,
+         visitor_batting6name,
+         visitor_batting7name,
+         visitor_batting8name,
+         visitor_batting9name) %>%
+  pivot_longer(-c(date_use, year_id, team)) %>% 
+  select(date_use, year_id, team, player = value)
+
+away_pos <- games %>% 
+  mutate(date_use = as.numeric(substr(game_id, 4,12))) %>% 
+  select(date_use, year_id, team = visiting_team, visitor_batting1position,
+         visitor_batting2position,
+         visitor_batting3position,
+         visitor_batting4position,
+         visitor_batting5position,
+         visitor_batting6position,
+         visitor_batting7position,
+         visitor_batting8position,
+         visitor_batting9position) %>%
+  pivot_longer(-c(date_use, year_id, team)) %>% 
+  select(position = value)
+
+away_combined <- cbind(away_players, away_pos)
+
+head(away_combined, 20)
+```
+
+In the data frame, for each game, there is a row for each position, the name of the player playing that position, the team for that player, the year, and the date of the game. This dataframe only contains the away teams, so I repeat the code for the home teams and rbind the two data frames together.
+
+```{r}
+
+home_players <- games %>% mutate(date_use = as.numeric(substr(game_id, 4,12))) %>% 
+  select(date_use, year_id, team = home_team, home_batting1name,
+         home_batting2name,
+         home_batting3name,
+         home_batting4name,
+         home_batting5name,
+         home_batting6name,
+         home_batting7name,
+         home_batting8name,
+         home_batting9name) %>%
+  pivot_longer(-c(date_use, year_id, team)) %>% 
+  select(date_use, year_id, team, player = value)
+
+home_pos <- games %>% mutate(date_use = as.numeric(substr(game_id, 4,12))) %>% 
+  select(date_use, year_id, team = home_team, home_batting1position,
+         home_batting2position,
+         home_batting3position,
+         home_batting4position,
+         home_batting5position,
+         home_batting6position,
+         home_batting7position,
+         home_batting8position,
+         home_batting9position) %>%
+  pivot_longer(-c(date_use, year_id, team)) %>% 
+  select(position = value)
+
+home_combined <- cbind(home_players, home_pos)
+
+lineups <- rbind(away_combined, home_combined)
+```
+
+
+The data set contains information for every game, while I am only interested in the first game of the season for each team. To filter out non-opening games, I group by each year and each team, then filter the date to be equal to the lowest date for each team in each year. The table below shows the opening day lineups for two teams in 1871.
+
+```{r}
+opening_day <- lineups %>%
+  group_by(year_id, team) %>% 
+  filter(date_use == min(date_use)) %>% 
+  ungroup() %>% 
+  mutate(year_id = as.numeric(year_id)) %>% 
+  arrange(year_id)
+
+head(opening_day, 18)
+```
+
+Next, I need to identify years where there is a new starter at a position for a team. The is_new() function evaluate whether one element of a vector is different from the previous element, while the streak_finder function finds how many consective elements something is present. In this case, the is_new will create a logical vector indicating whether there is a new starter at a position for a team and the streak finder function will use that logical vector to find the number of consectutive years there has been a new starter.
+
+Additionally, since teams can change names over time, I use the "CurrentNames.csv" file to add the franchise to each team.
+
+```{r}
+is_new <- function(vec) {
+  test <- NULL
+  test[2:length(vec)] <- vec[1:(length(vec)-1)] != vec[2:length(vec)]
+  test[1] <- TRUE
+  test
+}
+
+
+streak_finder <- function(vec){
+  test <- NULL
+  count <- 0
+  for(i in 1:length(vec)){
+    if(vec[i]){
+      count <- count +1
+    } else(count <- 1)
+    test[i] <- count
+  }
+  test
+}
+
+team_names <- read.csv("CurrentNames.csv", header = FALSE)[,1:2]
+colnames(team_names) <- c("franchise", "team")
+team_names <- distinct(team_names)
+
+opening_clean <- opening_day %>% 
+  left_join(team_names, by = "team") %>%
+  na.omit()
+
+opening_use <- opening_clean %>%
+  arrange(franchise, position) %>% 
+  mutate(new_player = is_new(player)) %>% 
+  group_by(franchise, position) %>% 
+  mutate(streak = streak_finder(new_player)) %>% 
+  ungroup() 
+```
+
+With each streak identified, I can identify the beginning and end of each streak and the players the first and last players in the streak. I have listed those below, only showing the streaks that had at least 10 different players.
+
+```{r}
+streaks_hit <- opening_use %>% filter(position != 1) %>% 
+  mutate(streak = streak-1) %>% 
+  filter(streak >= 10) %>%
+  select(year_id,team, player, position, franchise, streak) %>% 
+  mutate(begin_year = year_id - streak+1) %>% 
+  group_by(franchise, begin_year) %>% 
+  filter(streak == max(streak)) %>% 
+  ungroup %>% 
+  arrange(desc(begin_year)) %>% 
+  arrange(desc(streak))
+
+get_player_name <- function(fran, pos, yr){
+  opening_use %>%
+    filter(franchise == fran & position == pos & year_id == yr) %>% 
+    pull(player) %>% 
+    .[1]
+}
+
+streaks_hit$first_player <- sapply(1:nrow(streaks_hit), function(x) get_player_name(streaks_hit$franchise[x], streaks_hit$position[x], streaks_hit$begin_year[x]))
+
+streaks_hit$last_player <- sapply(1:nrow(streaks_hit), function(x) get_player_name(streaks_hit$franchise[x], streaks_hit$position[x], streaks_hit$year_id[x]))
+
+streaks_hit %>% 
+  na.omit() %>% 
+  select(Franchise = franchise,
+         Position = position,
+         Streak = streak,
+         "First Year" = begin_year,
+         "Last Year" = year_id,
+         "First Player" = first_player,
+         "Last Player" = last_player) %>% 
+  kableExtra::kable() %>% 
+  kableExtra::kable_styling() %>% 
+  kableExtra::scroll_box(height = "500px")
+
+```
+

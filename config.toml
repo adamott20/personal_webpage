@@ -1,0 +1,68 @@
+## Basic Configuration
+
+baseurl = "https://adamott20.github.io/"
+builddrafts = false
+canonifyurls = false
+languageCode = "en-US"
+
+contentdir = "content"
+layoutdir = "layouts"
+publishdir = "public"
+
+author = "Adam Ott"
+title = "Adam Ott"
+theme = "hugo-goa"
+
+## Hugo Built-in Features
+#disqusShortname = "https-shenoybr-github-io-hugo-goa-demo" # Comment out to disable Disqus.
+googleAnalytics = "XYZ"
+enableRobotsTXT = true
+
+## Site Settings
+[params]
+author = "Adam Ott"
+intro = "Data Scientist"
+description = "A data science blog that focuses on Sabermetrics with R"
+authorimage = "headshot.jpg"
+dateformat = "Jan 2, 2006"
+
+## Site Meta Settings
+[params.meta]
+description = "Simple minimalist theme"
+keywords = "minimalist,blog,goa,hugo,developer"
+
+## Social Accounts
+[params.social]
+github = "adamott20"
+linkedin = "adam-ott"
+twitter = "adamott20"
+email = "adamott20@gmail.com"
+
+## Extras
+[params.extra]
+poweredby = true
+highlightjs = true
+socialmarkup = true
+toc = true
+
+## Main Menu
+[[menu.main]]
+    name = "blog"
+    weight = 100
+    identifier = "blog"
+    url = "/blog/"
+[[menu.main]]
+    name = "about"
+    identifier = "about"
+    weight = 200
+    url = "/about/"
+[[menu.main]]
+    name = "cv"
+    identifier = "cv"
+    weight = 300
+    url = "/files/cv.pdf"
+[[menu.main]]
+    name = "Shiny Apps"
+    identifier = "shiny"
+    weight = 300
+    url = "/shiny/"

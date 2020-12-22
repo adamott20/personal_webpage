@@ -1,0 +1,33 @@
+---
+title: A Bayesian Approach to Catcher Framing
+author: ~
+date: '2020-12-22'
+slug: a-bayesian-approach-to-catcher-framing
+categories: []
+tags: []
+comments: no
+showcomments: yes
+showpagemeta: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Stat 651")
+```
+
+
+```{r}
+library(tidyverse)
+library(doParallel)
+library(foreach)
+library(baseballr)
+library(furrr)
+library(posterior)
+library(ggridges)
+library(xtable)
+library(rstan)
+library(lme4)
+library(emoGG)
+framing <- read_csv("framing.csv")
+```
+
