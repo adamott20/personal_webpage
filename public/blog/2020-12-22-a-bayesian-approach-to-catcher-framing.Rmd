@@ -15,8 +15,14 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/Stat 651")
 ```
 
+In baseball, although the most important factor in whether a pitch is called a strike or not is the location of the pitch, umpires and catchers also have some effect. Some catchers are better at ``framing" a pitch, presenting it to look like it was thrown in the strike zone. Understanding which catchers are good at framing can help teams know which catchers to attempt to sign or trade for. Some umpires have slightly larger strike zones than others, so they will call more strikes on average. Knowing the strike-calling tendencies of a particular umpire would help determine how a pitcher pitches throughout a game. Thus, knowing these effects would be valuable for a team.
 
-```{r}
+In this project, I fit a Bayesian mixed effect logistic regression model to achieve three goals. First, I discover which catchers are best (and worst) at framing. That is, I identify which catchers have the biggest positive (and negative) effect on whether a pitch is called a strike. Second, I find which umpires have the biggest (and smallest) strike zones, the umpires that have the biggest positive (and negative) effect on whether a pitch is called a strike. Finally, I identify whether the catcher or the umpire can make a bigger influence in whether a pitch is called a strike.
+
+To achieve these goals, I use a data set collected from baseballsavant.com, the location of all pitch tracking data for Major League Baseball (MLB). The data set contains every pitch at which the batter didn't swing in the 2020 MLB regular season. For each pitch, the data set contains whether the pitch was called a strike, the $x$ and $y$ coordinates of the pitch when it crossed the plate, the catcher on the play, and the umpire making the call. The data set includes $133,425$ total pitches caught by $78$ catchers and called by $82$ umpires. For simplicity, before modeling, I convert the $x$ and $y$ coordinates to horizontal and vertical distances from the center of the strike zone. This adds the assumption that the strike zone is symmetric vertically and horizontally (as the rule book states it should be). This transformation makes the effects of location monotone, eliminating the need for a basis function expansion for pitch location and keeping the model simple.
+
+
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(doParallel)
 library(foreach)
@@ -31,3 +37,57 @@ library(emoGG)
 framing <- read_csv("framing.csv")
 ```
 
+As stated, I fit a Bayesian logistic regression mixed effects model. The sampling model is as follows:
+
+$$y_{ijk} | \beta_0, \beta_1, \beta_2, \beta_3, \alpha_j, \gamma_k  \sim Bernoulli(\pi_{ijk})$$
+$$logit(\pi_{ijk}) = \beta_0 + x_{1i}\beta_1 + x_{2i}\beta_2 + x_{1i}x_{2i}\beta_3 + \alpha_j + \gamma_k$$
+
+In this model, $y_{ijk}$ is a binary variable indicating whether pitch $i$ caught by catcher $j$ was called a strike by umpire $k$, $\pi_{ijk}$ is the probability the pitch would be called a strike, $\beta_0$ is the model intercept, $x_{1i}$ is the horizontal distance from the center of the strike zone for pitch $i$, $x_{2i}$ is the vertical distance from the center of the strike zone for pitch $i$, $\beta_1$ and $\beta_2$ are the corresponding effects for the distance from the center of the strike zone, $\beta_3$ is an interaction effect, $\alpha_j$ is the effect of catcher $j$ catching the pitch, and $\gamma_k$ is effect of umpire $k$ calling the pitch. The $\alpha$ parameters come from a common distribution and the $\gamma$ parameters come from their own common distribution, giving the model a hierarchical structure.
+
+In forming the prior distribution for the parameters, I assume that each parameter is independent of the others. This is a reasonable assumption since the strike zone is a rectangle, so the effect of how high a pitch is shouldn't change the effect of the horizontal distance from the center of the strike zone. Additionally, neither a catcher nor an umpire should impact the effects of the other catchers or umpires. Because of this, the joint prior distribution can be separated into the product of the marginal prior distributions. In other words, 
+
+\begin{equation} \label{eq1}
+\begin{split}
+p(\beta_0, \beta_1, \beta_2, \alpha_1, ..., \alpha_K, \gamma_1, ..., \gamma_K, \tau, T) &= p(\beta_0) p(\beta_1) p(\beta_2) p(\alpha_1, ...,\alpha_J, \tau), p(\gamma_1, ..., \gamma_K, T)\\
+&= p(\beta_0) p(\beta_1) p(\beta_2) p(\alpha_1|\tau) ... p(\alpha_J|\tau) p(\tau) p(\gamma_1|T) ... p(\gamma_K|T)p(T).
+\end{split}
+\end{equation}
+
+
+The prior distributions are as follows:
+
+\begin{multicols}{2}
+$$\beta_0 \sim Normal(8,3^2)$$
+$$\beta_1 \sim Normal(-5,2^2)$$
+$$\beta_2 \sim Normal(-5,2^2)$$
+$$\beta_3 \sim Normal(3, 2^2)$$
+$$\alpha_j | \tau \sim Normal(0, \frac{1}{\tau})$$
+$$\gamma_k | T \sim Normal(0, \frac{1}{T})$$
+$$\tau \sim Gamma(10,.1)$$
+$$T \sim Gamma(10,.1)$$
+\end{multicols}
+
+
+
+The priors on the $\beta$ coefficients were chosen to make the probabilities that certain pitches would be called a strike with an average catcher and umpire reasonable. Using the means of the prior distributions as estimates of each of the parameters, when a pitch is in the center of the strike zone ($x_1 = 0, x_2 = 0$), the probability of the pitch being called a strike is $.9997$. For a pitch at the edge of the strike zone ($x_1 = 1, x_2 = 0$), the probability of the pitch being called a strike is $.9526$. The probability of a pitch at the corner of the strike zone ($x_1 = 1, x_2 = 1$) being called a strike is $.7311$. This is consistent with my past baseball experience, but because of the large number of pitches in the data set, the posterior distribution is free to migrate from these initial estimates.
+
+The prior distribution on each $\alpha$ parameter assumes that the value generated from each catcher's framing ability comes from some common normal distribution with precision $\tau$. Because a catcher should only be able to add marginal value through framing, this distribution should have a small standard deviation, and thus a high precision. The $\tau$ parameter controls how much variability there is among catchers in their framing abilities and how much value one catcher can add. The shape and rate parameters of the gamma distribution are $10$ and $.1$, respectively, which correspond to an expected $\tau$ of 100 or a standard deviation of .1 in the distribution for the $\alpha$ parameters, which seems like a reasonable amount of variability in the value a catcher can add. The distribution for $\tau$ is somewhat diffuse, allowing it to be impacted by the data. The reasoning for the priors for the $\gamma$ parameters and $T$ was similar.
+
+
+I gather draws from the joint posterior distribution once "by hand" (implementing my own code in R) and once using the software Stan. For the "by hand" algorithm, given the sampling model and prior distributions, I can evaluate the posterior distribution up to a proportionality constant by multiplying the joint sampling model by the joint prior distribution. The integral needed to calculate the proportionality constant cannot be evaluated in closed form, so I gather samples from the posterior distribution using sampling techniques. Choosing a disperse set of initial values for each parameter, I can iteratively update each parameter. In the algorithm, I first update $\tau$ and $T$, where the full conditional distributions can be derived in closed form. Given each of the $J$ $\alpha_j$ values and a prior distribution on $\tau$ of $Gamma(a,b)$, the conditional posterior distribution of $\tau$ is a $Gamma(a + \frac{J}{2}, b + \frac{1}{2} \sum_{j=1}^J  \alpha_j^2)$ distribution. Similarly, given each of the $K$ $\gamma_k$ values and a prior distribution on $T$ of $Gamma(c,d)$, the conditional posterior distribution of $T$ is a $Gamma(c + \frac{K}{2}, d + \frac{1}{2} \sum_{k=1}^K  \gamma_k^2)$ distribution. Then, I update each $\alpha$ parameter. For each $\alpha_j$, I propose a new value using a symmetric, uniform proposal distribution.  I then compute the ratio of posterior densities of the proposed $\alpha_j$ compared to the previous $\alpha_j$ and accept the new value with probability equal to that ratio. Because the likelihood of the pitches not caught by catcher $j$ and the densities of the other parameters are not affected by the updated $\alpha_j$, many of the terms in the acceptance ratio  cancel out and the computational burden is simplified. Equation \ref{eq2} shows that the acceptance ratio for a new $\alpha_1$ value (or any other $\alpha$ parameter) simplifies to the likelihood only including the pitches caught by catcher 1 given the proposed $\alpha_1$ and all other current parameters times the prior density of the proposed $\alpha_1$ given the current $\tau$ over that same product, but with the previous $\alpha_1$ value. This ratio is further simplified by evaluating it on the log scale then exponentiating the result to find the probability of accepting a proposed draw.
+
+
+\begin{equation} \label{eq2}
+\begin{split}
+	&p(accept\:\alpha_1^*) = \frac{p(\beta_0,..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T | \mathbf{y})}{p(\beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1, ..., \gamma_K, \tau, T | \mathbf{y})}\\ 
+	&= \frac{k\:p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\beta_0,..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T)}{k\:p(\mathbf{y} | \beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T)}\\
+	&= \frac{p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1^*|\tau)}{p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1|\tau)}\\
+	&= \frac{p(\mathbf{y_{.1.}} | \beta_0, ..., \beta_3, \alpha_1^*, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1^*|\tau)}{p(\mathbf{y_{.1.}} | \beta_0, ..., \beta_3, \alpha_1, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1|\tau)}\\
+\end{split}
+\end{equation}
+
+After updating all the $\alpha$ parameters, I similarly update all the $\gamma$ parameters. A similar cancellation occurs when evaluating the ratio of posterior densities for each proposed $\gamma$. I then update the four $\beta$ parameters. Because the four parameters are correlated, I update them simultaneously with a symmetric multivariate proposal distribution, using the multivariate normal distribution centered on the previous accepted draw. The same cancellation does not occur with the acceptance ratio of the $\beta$ parameters. Because of this, the full posterior density with the proposed $\beta$ parameters and the previous $\beta$ parameters must be evaluated to find the acceptance ratio. The proposed parameters are accepted with probability equal to that ratio.
+
+Using this algorithm, I gather 15,000 posterior draws for each parameter, of which I discard the first 5,000 as burn in. To assess convergence and improve the speed of the algorithm, three separate chains are run in parallel with different starting values, leading to 30,000 posterior draws from which to perform inference. Trace plots and the $\hat{R}$ statistic for the log posterior density are used to assess convergence. The $\hat{R}$ statistic is a measure of convergence relating to the variance between chains and the variance within chains with a value near 1 ($<1.1$) indicating good convergence \citep{gelmanbda04}. The effective sample size of the log posterior density is also monitored to ensure that inference is based on an adequate number of draws. Additionally, a posterior predictive goodness of fit test is used to assess model fit. In it, I use 1,500 samples from the posterior distribution to gather 1,500 draws from the posterior predictive distribution on the number of strikes that each catcher would have had called on the pitches they caught. Using those same 1,500 samples from the posterior distribution, I also find the expected number of strikes the catcher would have had called by summing all of the individual probabilities that a pitch would be called a strike. For each of the 1,500 posterior predictive values and each of the 1,500 values for expected strikes, I calculate two goodness of fit statistics $t$, one for the posterior predictive value and one for the actual number of strikes the catcher had called, where $t = \frac{(observed-expected)^2}{expected}$. The $p$-value for the posterior predictive test is then the proportion of times that $t_{pred} > t_{actual}$. A $p$-value near 0 or 1 is an indication that the model doesn't fit the data well.
+
+Additionally, I perform a sensitivity analysis on my model by entertaining both a more diffuse and a more informative prior distribution. The diffuse prior distribution includes a $Normal(0,30^2)$ distribution for each of the $\beta$ coefficients and a $Gamma(1, .001)$ distribution for both $\tau$ and $T$. The more informative prior has the same mean as the original prior for the $\beta$ coefficients, but a variance of 1. For $\tau$ and $T$, the informed prior will use a $Gamma(50, .5)$ distribution. I will also perform the same analysis using Frequentist methods, fitting a logistic regression model with random effects for catcher and umpire, allowing for comparison of the results of the Frequentist and Bayesian analyses. Using the ``by hand" algorithm, Stan, and a Frequentist analysis, I answer the questions of which catchers are best framers, which umpires have the biggest strike zones, and whether catchers or umpires have a bigger effect on whether a pitch is called a strike.

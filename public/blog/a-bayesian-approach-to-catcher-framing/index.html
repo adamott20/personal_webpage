@@ -60,76 +60,52 @@
   <div class="col-md-12 text-justify content">
     
     
+    
+    
 
 
-<pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --</code></pre>
-<pre><code>## v ggplot2 3.3.2     v purrr   0.3.4
-## v tibble  3.0.4     v dplyr   1.0.2
-## v tidyr   1.1.2     v stringr 1.4.0
-## v readr   1.4.0     v forcats 0.5.0</code></pre>
-<pre><code>## Warning: package &#39;tibble&#39; was built under R version 4.0.3</code></pre>
-<pre><code>## Warning: package &#39;tidyr&#39; was built under R version 4.0.3</code></pre>
-<pre><code>## Warning: package &#39;readr&#39; was built under R version 4.0.3</code></pre>
-<pre><code>## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
-## x dplyr::filter() masks stats::filter()
-## x dplyr::lag()    masks stats::lag()</code></pre>
-<pre class="r"><code>library(doParallel)</code></pre>
-<pre><code>## Loading required package: foreach</code></pre>
-<pre><code>## 
-## Attaching package: &#39;foreach&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:purrr&#39;:
-## 
-##     accumulate, when</code></pre>
-<pre><code>## Loading required package: iterators</code></pre>
-<pre><code>## Loading required package: parallel</code></pre>
-<pre class="r"><code>library(foreach)
-library(baseballr)</code></pre>
-<pre><code>## Registered S3 method overwritten by &#39;quantmod&#39;:
-##   method            from
-##   as.zoo.data.frame zoo</code></pre>
-<pre class="r"><code>library(furrr)</code></pre>
-<pre><code>## Loading required package: future</code></pre>
-<pre class="r"><code>library(posterior)</code></pre>
-<pre><code>## This is posterior version 0.1.2</code></pre>
-<pre class="r"><code>library(ggridges)
+<p>In baseball, although the most important factor in whether a pitch is called a strike or not is the location of the pitch, umpires and catchers also have some effect. Some catchers are better at ``framing" a pitch, presenting it to look like it was thrown in the strike zone. Understanding which catchers are good at framing can help teams know which catchers to attempt to sign or trade for. Some umpires have slightly larger strike zones than others, so they will call more strikes on average. Knowing the strike-calling tendencies of a particular umpire would help determine how a pitcher pitches throughout a game. Thus, knowing these effects would be valuable for a team.</p>
+<p>In this project, I fit a Bayesian mixed effect logistic regression model to achieve three goals. First, I discover which catchers are best (and worst) at framing. That is, I identify which catchers have the biggest positive (and negative) effect on whether a pitch is called a strike. Second, I find which umpires have the biggest (and smallest) strike zones, the umpires that have the biggest positive (and negative) effect on whether a pitch is called a strike. Finally, I identify whether the catcher or the umpire can make a bigger influence in whether a pitch is called a strike.</p>
+<p>To achieve these goals, I use a data set collected from baseballsavant.com, the location of all pitch tracking data for Major League Baseball (MLB). The data set contains every pitch at which the batter didn’t swing in the 2020 MLB regular season. For each pitch, the data set contains whether the pitch was called a strike, the <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span> coordinates of the pitch when it crossed the plate, the catcher on the play, and the umpire making the call. The data set includes <span class="math inline">\(133,425\)</span> total pitches caught by <span class="math inline">\(78\)</span> catchers and called by <span class="math inline">\(82\)</span> umpires. For simplicity, before modeling, I convert the <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span> coordinates to horizontal and vertical distances from the center of the strike zone. This adds the assumption that the strike zone is symmetric vertically and horizontally (as the rule book states it should be). This transformation makes the effects of location monotone, eliminating the need for a basis function expansion for pitch location and keeping the model simple.</p>
+<pre class="r"><code>library(tidyverse)
+library(doParallel)
+library(foreach)
+library(baseballr)
+library(furrr)
+library(posterior)
+library(ggridges)
 library(xtable)
-library(rstan)</code></pre>
-<pre><code>## Loading required package: StanHeaders</code></pre>
-<pre><code>## rstan (Version 2.21.2, GitRev: 2e1f913d3ca3)</code></pre>
-<pre><code>## For execution on a local, multicore CPU with excess RAM we recommend calling
-## options(mc.cores = parallel::detectCores()).
-## To avoid recompilation of unchanged Stan programs, we recommend calling
-## rstan_options(auto_write = TRUE)</code></pre>
-<pre><code>## Do not specify &#39;-march=native&#39; in &#39;LOCAL_CPPFLAGS&#39; or a Makevars file</code></pre>
-<pre><code>## 
-## Attaching package: &#39;rstan&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:posterior&#39;:
-## 
-##     ess_bulk, ess_tail</code></pre>
-<pre><code>## The following object is masked from &#39;package:tidyr&#39;:
-## 
-##     extract</code></pre>
-<pre class="r"><code>library(lme4)</code></pre>
-<pre><code>## Loading required package: Matrix</code></pre>
-<pre><code>## 
-## Attaching package: &#39;Matrix&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:tidyr&#39;:
-## 
-##     expand, pack, unpack</code></pre>
-<pre class="r"><code>library(emoGG)
+library(rstan)
+library(lme4)
+library(emoGG)
 framing &lt;- read_csv(&quot;framing.csv&quot;)</code></pre>
-<pre><code>## 
-## -- Column specification --------------------------------------------------------
-## cols(
-##   is_strike = col_double(),
-##   catcher_id = col_double(),
-##   umpire_name = col_character(),
-##   plate_x = col_double(),
-##   plate_z = col_double(),
-##   sz_top = col_double(),
-##   sz_bot = col_double()
-## )</code></pre>
+<p>As stated, I fit a Bayesian logistic regression mixed effects model. The sampling model is as follows:</p>
+<p><span class="math display">\[y_{ijk} | \beta_0, \beta_1, \beta_2, \beta_3, \alpha_j, \gamma_k  \sim Bernoulli(\pi_{ijk})\]</span>
+<span class="math display">\[logit(\pi_{ijk}) = \beta_0 + x_{1i}\beta_1 + x_{2i}\beta_2 + x_{1i}x_{2i}\beta_3 + \alpha_j + \gamma_k\]</span></p>
+<p>In this model, <span class="math inline">\(y_{ijk}\)</span> is a binary variable indicating whether pitch <span class="math inline">\(i\)</span> caught by catcher <span class="math inline">\(j\)</span> was called a strike by umpire <span class="math inline">\(k\)</span>, <span class="math inline">\(\pi_{ijk}\)</span> is the probability the pitch would be called a strike, <span class="math inline">\(\beta_0\)</span> is the model intercept, <span class="math inline">\(x_{1i}\)</span> is the horizontal distance from the center of the strike zone for pitch <span class="math inline">\(i\)</span>, <span class="math inline">\(x_{2i}\)</span> is the vertical distance from the center of the strike zone for pitch <span class="math inline">\(i\)</span>, <span class="math inline">\(\beta_1\)</span> and <span class="math inline">\(\beta_2\)</span> are the corresponding effects for the distance from the center of the strike zone, <span class="math inline">\(\beta_3\)</span> is an interaction effect, <span class="math inline">\(\alpha_j\)</span> is the effect of catcher <span class="math inline">\(j\)</span> catching the pitch, and <span class="math inline">\(\gamma_k\)</span> is effect of umpire <span class="math inline">\(k\)</span> calling the pitch. The <span class="math inline">\(\alpha\)</span> parameters come from a common distribution and the <span class="math inline">\(\gamma\)</span> parameters come from their own common distribution, giving the model a hierarchical structure.</p>
+<p>In forming the prior distribution for the parameters, I assume that each parameter is independent of the others. This is a reasonable assumption since the strike zone is a rectangle, so the effect of how high a pitch is shouldn’t change the effect of the horizontal distance from the center of the strike zone. Additionally, neither a catcher nor an umpire should impact the effects of the other catchers or umpires. Because of this, the joint prior distribution can be separated into the product of the marginal prior distributions. In other words,</p>
+<p><span class="math display">\[\begin{equation} \label{eq1}
+\begin{split}
+p(\beta_0, \beta_1, \beta_2, \alpha_1, ..., \alpha_K, \gamma_1, ..., \gamma_K, \tau, T) &amp;= p(\beta_0) p(\beta_1) p(\beta_2) p(\alpha_1, ...,\alpha_J, \tau), p(\gamma_1, ..., \gamma_K, T)\\
+&amp;= p(\beta_0) p(\beta_1) p(\beta_2) p(\alpha_1|\tau) ... p(\alpha_J|\tau) p(\tau) p(\gamma_1|T) ... p(\gamma_K|T)p(T).
+\end{split}
+\end{equation}\]</span></p>
+<p>The prior distributions are as follows:</p>
+
+<p>The priors on the <span class="math inline">\(\beta\)</span> coefficients were chosen to make the probabilities that certain pitches would be called a strike with an average catcher and umpire reasonable. Using the means of the prior distributions as estimates of each of the parameters, when a pitch is in the center of the strike zone (<span class="math inline">\(x_1 = 0, x_2 = 0\)</span>), the probability of the pitch being called a strike is <span class="math inline">\(.9997\)</span>. For a pitch at the edge of the strike zone (<span class="math inline">\(x_1 = 1, x_2 = 0\)</span>), the probability of the pitch being called a strike is <span class="math inline">\(.9526\)</span>. The probability of a pitch at the corner of the strike zone (<span class="math inline">\(x_1 = 1, x_2 = 1\)</span>) being called a strike is <span class="math inline">\(.7311\)</span>. This is consistent with my past baseball experience, but because of the large number of pitches in the data set, the posterior distribution is free to migrate from these initial estimates.</p>
+<p>The prior distribution on each <span class="math inline">\(\alpha\)</span> parameter assumes that the value generated from each catcher’s framing ability comes from some common normal distribution with precision <span class="math inline">\(\tau\)</span>. Because a catcher should only be able to add marginal value through framing, this distribution should have a small standard deviation, and thus a high precision. The <span class="math inline">\(\tau\)</span> parameter controls how much variability there is among catchers in their framing abilities and how much value one catcher can add. The shape and rate parameters of the gamma distribution are <span class="math inline">\(10\)</span> and <span class="math inline">\(.1\)</span>, respectively, which correspond to an expected <span class="math inline">\(\tau\)</span> of 100 or a standard deviation of .1 in the distribution for the <span class="math inline">\(\alpha\)</span> parameters, which seems like a reasonable amount of variability in the value a catcher can add. The distribution for <span class="math inline">\(\tau\)</span> is somewhat diffuse, allowing it to be impacted by the data. The reasoning for the priors for the <span class="math inline">\(\gamma\)</span> parameters and <span class="math inline">\(T\)</span> was similar.</p>
+<p>I gather draws from the joint posterior distribution once “by hand” (implementing my own code in R) and once using the software Stan. For the “by hand” algorithm, given the sampling model and prior distributions, I can evaluate the posterior distribution up to a proportionality constant by multiplying the joint sampling model by the joint prior distribution. The integral needed to calculate the proportionality constant cannot be evaluated in closed form, so I gather samples from the posterior distribution using sampling techniques. Choosing a disperse set of initial values for each parameter, I can iteratively update each parameter. In the algorithm, I first update <span class="math inline">\(\tau\)</span> and <span class="math inline">\(T\)</span>, where the full conditional distributions can be derived in closed form. Given each of the <span class="math inline">\(J\)</span> <span class="math inline">\(\alpha_j\)</span> values and a prior distribution on <span class="math inline">\(\tau\)</span> of <span class="math inline">\(Gamma(a,b)\)</span>, the conditional posterior distribution of <span class="math inline">\(\tau\)</span> is a <span class="math inline">\(Gamma(a + \frac{J}{2}, b + \frac{1}{2} \sum_{j=1}^J \alpha_j^2)\)</span> distribution. Similarly, given each of the <span class="math inline">\(K\)</span> <span class="math inline">\(\gamma_k\)</span> values and a prior distribution on <span class="math inline">\(T\)</span> of <span class="math inline">\(Gamma(c,d)\)</span>, the conditional posterior distribution of <span class="math inline">\(T\)</span> is a <span class="math inline">\(Gamma(c + \frac{K}{2}, d + \frac{1}{2} \sum_{k=1}^K \gamma_k^2)\)</span> distribution. Then, I update each <span class="math inline">\(\alpha\)</span> parameter. For each <span class="math inline">\(\alpha_j\)</span>, I propose a new value using a symmetric, uniform proposal distribution. I then compute the ratio of posterior densities of the proposed <span class="math inline">\(\alpha_j\)</span> compared to the previous <span class="math inline">\(\alpha_j\)</span> and accept the new value with probability equal to that ratio. Because the likelihood of the pitches not caught by catcher <span class="math inline">\(j\)</span> and the densities of the other parameters are not affected by the updated <span class="math inline">\(\alpha_j\)</span>, many of the terms in the acceptance ratio cancel out and the computational burden is simplified. Equation  shows that the acceptance ratio for a new <span class="math inline">\(\alpha_1\)</span> value (or any other <span class="math inline">\(\alpha\)</span> parameter) simplifies to the likelihood only including the pitches caught by catcher 1 given the proposed <span class="math inline">\(\alpha_1\)</span> and all other current parameters times the prior density of the proposed <span class="math inline">\(\alpha_1\)</span> given the current <span class="math inline">\(\tau\)</span> over that same product, but with the previous <span class="math inline">\(\alpha_1\)</span> value. This ratio is further simplified by evaluating it on the log scale then exponentiating the result to find the probability of accepting a proposed draw.</p>
+<p><span class="math display">\[\begin{equation} \label{eq2}
+\begin{split}
+    &amp;p(accept\:\alpha_1^*) = \frac{p(\beta_0,..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T | \mathbf{y})}{p(\beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1, ..., \gamma_K, \tau, T | \mathbf{y})}\\ 
+    &amp;= \frac{k\:p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\beta_0,..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T)}{k\:p(\mathbf{y} | \beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\beta_0,..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T)}\\
+    &amp;= \frac{p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1^*, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1^*|\tau)}{p(\mathbf{y} | \beta_0, ..., \beta_3, \alpha_1, \alpha_2,..., \alpha_J, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1|\tau)}\\
+    &amp;= \frac{p(\mathbf{y_{.1.}} | \beta_0, ..., \beta_3, \alpha_1^*, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1^*|\tau)}{p(\mathbf{y_{.1.}} | \beta_0, ..., \beta_3, \alpha_1, \gamma_1,..., \gamma_K, \tau, T) p(\alpha_1|\tau)}\\
+\end{split}
+\end{equation}\]</span></p>
+<p>After updating all the <span class="math inline">\(\alpha\)</span> parameters, I similarly update all the <span class="math inline">\(\gamma\)</span> parameters. A similar cancellation occurs when evaluating the ratio of posterior densities for each proposed <span class="math inline">\(\gamma\)</span>. I then update the four <span class="math inline">\(\beta\)</span> parameters. Because the four parameters are correlated, I update them simultaneously with a symmetric multivariate proposal distribution, using the multivariate normal distribution centered on the previous accepted draw. The same cancellation does not occur with the acceptance ratio of the <span class="math inline">\(\beta\)</span> parameters. Because of this, the full posterior density with the proposed <span class="math inline">\(\beta\)</span> parameters and the previous <span class="math inline">\(\beta\)</span> parameters must be evaluated to find the acceptance ratio. The proposed parameters are accepted with probability equal to that ratio.</p>
+<p>Using this algorithm, I gather 15,000 posterior draws for each parameter, of which I discard the first 5,000 as burn in. To assess convergence and improve the speed of the algorithm, three separate chains are run in parallel with different starting values, leading to 30,000 posterior draws from which to perform inference. Trace plots and the <span class="math inline">\(\hat{R}\)</span> statistic for the log posterior density are used to assess convergence. The <span class="math inline">\(\hat{R}\)</span> statistic is a measure of convergence relating to the variance between chains and the variance within chains with a value near 1 (<span class="math inline">\(&lt;1.1\)</span>) indicating good convergence . The effective sample size of the log posterior density is also monitored to ensure that inference is based on an adequate number of draws. Additionally, a posterior predictive goodness of fit test is used to assess model fit. In it, I use 1,500 samples from the posterior distribution to gather 1,500 draws from the posterior predictive distribution on the number of strikes that each catcher would have had called on the pitches they caught. Using those same 1,500 samples from the posterior distribution, I also find the expected number of strikes the catcher would have had called by summing all of the individual probabilities that a pitch would be called a strike. For each of the 1,500 posterior predictive values and each of the 1,500 values for expected strikes, I calculate two goodness of fit statistics <span class="math inline">\(t\)</span>, one for the posterior predictive value and one for the actual number of strikes the catcher had called, where <span class="math inline">\(t = \frac{(observed-expected)^2}{expected}\)</span>. The <span class="math inline">\(p\)</span>-value for the posterior predictive test is then the proportion of times that <span class="math inline">\(t_{pred} &gt; t_{actual}\)</span>. A <span class="math inline">\(p\)</span>-value near 0 or 1 is an indication that the model doesn’t fit the data well.</p>
+<p>Additionally, I perform a sensitivity analysis on my model by entertaining both a more diffuse and a more informative prior distribution. The diffuse prior distribution includes a <span class="math inline">\(Normal(0,30^2)\)</span> distribution for each of the <span class="math inline">\(\beta\)</span> coefficients and a <span class="math inline">\(Gamma(1, .001)\)</span> distribution for both <span class="math inline">\(\tau\)</span> and <span class="math inline">\(T\)</span>. The more informative prior has the same mean as the original prior for the <span class="math inline">\(\beta\)</span> coefficients, but a variance of 1. For <span class="math inline">\(\tau\)</span> and <span class="math inline">\(T\)</span>, the informed prior will use a <span class="math inline">\(Gamma(50, .5)\)</span> distribution. I will also perform the same analysis using Frequentist methods, fitting a logistic regression model with random effects for catcher and umpire, allowing for comparison of the results of the Frequentist and Bayesian analyses. Using the ``by hand" algorithm, Stan, and a Frequentist analysis, I answer the questions of which catchers are best framers, which umpires have the biggest strike zones, and whether catchers or umpires have a bigger effect on whether a pitch is called a strike.</p>
 
   </div>
 </section>
@@ -210,7 +186,13 @@ if (!doNotTrack) {
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 <script src="js/main.js"></script>
 <script src="js/custom.js"></script>
+<script src="//yihui.org/js/math-code.js"></script>
+<script async
+src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 </body>
 </html>
+
+
 
 

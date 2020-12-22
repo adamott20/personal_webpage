@@ -13,7 +13,7 @@
       <pubDate>Tue, 22 Dec 2020 00:00:00 +0000</pubDate>
       
       <guid>/blog/a-bayesian-approach-to-catcher-framing/</guid>
-      <description>library(tidyverse)## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --## v ggplot2 3.3.2 v purrr 0.3.4## v tibble 3.0.4 v dplyr 1.0.2## v tidyr 1.1.2 v stringr 1.4.0## v readr 1.4.0 v forcats 0.5.0## Warning: package &amp;#39;tibble&amp;#39; was built under R version 4.0.3## Warning: package &amp;#39;tidyr&amp;#39; was built under R version 4.0.3## Warning: package &amp;#39;readr&amp;#39; was built under R version 4.0.3## -- Conflicts ------------------------------------------ tidyverse_conflicts() --## x dplyr::filter() masks stats::filter()## x dplyr::lag() masks stats::lag()library(doParallel)## Loading required package: foreach## ## Attaching package: &amp;#39;foreach&amp;#39;## The following objects are masked from &amp;#39;package:purrr&amp;#39;:## ## accumulate, when## Loading required package: iterators## Loading required package: parallellibrary(foreach)library(baseballr)## Registered S3 method overwritten by &amp;#39;quantmod&amp;#39;:## method from## as.</description>
+      <description>In baseball, although the most important factor in whether a pitch is called a strike or not is the location of the pitch, umpires and catchers also have some effect. Some catchers are better at ``framing&#34; a pitch, presenting it to look like it was thrown in the strike zone. Understanding which catchers are good at framing can help teams know which catchers to attempt to sign or trade for.</description>
     </item>
     
     <item>
