@@ -1,6 +1,6 @@
 ## Basic Configuration
 
-baseurl = "https://adamott20.github.io/"
+baseurl = "https://sabe-r-metrics.netlify.app"
 builddrafts = false
 canonifyurls = false
 languageCode = "en-US"
