@@ -250,7 +250,6 @@ ggplot() +
                      labels = filter(kl_plot, keep_name) %&gt;% arrange(player_name) %&gt;%  pull(player_name)) +
   scale_fill_manual(name = &quot;Player&quot;, values = c(2:8, 10:16),
                     labels = filter(kl_plot, keep_name) %&gt;% arrange(player_name) %&gt;% pull(player_name)) +
-  #guides(colour = guide_legend(override.aes = list(shape = override.shape, fill = override.fill)))
   facet_wrap(~cluster) +
   theme_light() +
   labs(x = &quot;BABIP&quot;, y = &quot;HR/FB&quot;) +
@@ -266,14 +265,13 @@ ggplot() +
          launch_angle = launch_angle*sd_la+mean_la) %&gt;% 
   filter(cluster %in% c(2,10,18,19)) %&gt;% 
   ggplot(aes(x=launch_speed, y = launch_angle)) +
-  geom_density2d_filled(bins = 50, alpha = .8) +
+  geom_density2d_filled(bins = 50, alpha = .8, na.rm = TRUE) +
   facet_wrap(~cluster) +
   theme_light() +
   theme(legend.position = &quot;none&quot;) +
   labs(x = &quot;Exit Velocity&quot;, y = &quot;Launch Angle&quot;, title = &quot;Overall Distributions of Select Clusters&quot;) +
   scale_x_continuous(limits = c(50, 120)) +
   scale_y_continuous(limits = c(-60,60))</code></pre>
-<pre><code>## Warning: Removed 634 rows containing non-finite values (stat_density2d_filled).</code></pre>
 <p><img src="/blog/2020-12-24-clustering-hitters-by-their-distribution-of-batted-balls_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
 <p>There are a variety of future applications for the clusters formed from this analysis. They could be used to have a larger sample size when predicting batter vs. pitcher matchups, to reduce the amount of information needed on a scouting report, or to identify underachieving players that belong to the same cluster as stars, prompting more work on their development.</p>
 

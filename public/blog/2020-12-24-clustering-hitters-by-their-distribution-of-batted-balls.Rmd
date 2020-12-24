@@ -227,7 +227,6 @@ ggplot() +
                      labels = filter(kl_plot, keep_name) %>% arrange(player_name) %>%  pull(player_name)) +
   scale_fill_manual(name = "Player", values = c(2:8, 10:16),
                     labels = filter(kl_plot, keep_name) %>% arrange(player_name) %>% pull(player_name)) +
-  #guides(colour = guide_legend(override.aes = list(shape = override.shape, fill = override.fill)))
   facet_wrap(~cluster) +
   theme_light() +
   labs(x = "BABIP", y = "HR/FB") +
@@ -248,7 +247,7 @@ in_play %>%
          launch_angle = launch_angle*sd_la+mean_la) %>% 
   filter(cluster %in% c(2,10,18,19)) %>% 
   ggplot(aes(x=launch_speed, y = launch_angle)) +
-  geom_density2d_filled(bins = 50, alpha = .8) +
+  geom_density2d_filled(bins = 50, alpha = .8, na.rm = TRUE) +
   facet_wrap(~cluster) +
   theme_light() +
   theme(legend.position = "none") +
