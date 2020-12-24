@@ -1,0 +1,1975 @@
+---
+title: Combined Half No-Hitters
+author: ~
+date: '2020-12-23'
+slug: combined-half-no-hitters
+categories: []
+tags: []
+comments: no
+showcomments: yes
+showpagemeta: yes
+---
+
+<script src="/rmarkdown-libs/kePrint/kePrint.js"></script>
+
+
+<p>In August 2020 on Episode 1580 of “Effectively Wild”, there was a discussion about “Combined Half No-Hitters”, where neither team allows a hit through 4.5 innings, leading to 9 total half-innings without a hit. I did the queries in my Retrosheet database to find a list of every combined half no-hitter.</p>
+<p>To look this up, I first read in attached my R session to my PostgreSQL database using the “dbcon.R” file, then read in the necessary columns of the play-by-play table.</p>
+<pre class="r"><code>library(tidyverse)
+library(lubridate)
+source(&quot;dbcon.R&quot;)
+pbp &lt;- dbGetQuery(con, &quot;select game_id, away_team_id, inn_ct, bat_home_id, event_cd from retro_pbp_2&quot;)
+games &lt;- dbGetQuery(con, &quot;select game_id, home_starting_pitcher_name, visitor_starting_pitcher_name from retro_games&quot;)</code></pre>
+<p>I then filter the play-by-play to the first 4.5 innings of the games, grouped by the game, and counted the number of hits (hits have an event code between 20 and 23). Games that fit the combined half no-hitter description will have no hits in the first 4.5 innings, so I filter to the games that have no hits and arrange by most recent date. The below table shows every combined half no-hitter in the database.</p>
+<pre class="r"><code>nohit &lt;- pbp %&gt;% 
+  filter(inn_ct &lt; 5 | (inn_ct == 5 &amp; bat_home_id == 0)) %&gt;% 
+  group_by(game_id, away_team_id) %&gt;% 
+  summarize(n_hits = sum(event_cd %in% 20:23, na.rm = TRUE)) %&gt;% 
+  ungroup() %&gt;% 
+  filter(n_hits == 0) %&gt;% 
+  arrange(desc(as.numeric(substr(game_id, 4,11))))
+
+nohit %&gt;% 
+  mutate(home_team = substr(game_id, 1,3)) %&gt;% 
+  mutate(date = ymd(as.numeric(substr(game_id, 4,11)))) %&gt;% 
+  left_join(games, by = &quot;game_id&quot;) %&gt;% 
+  select(Date = date,
+         &quot;Home Team&quot; = home_team, 
+         &quot;Home Starter&quot; = home_starting_pitcher_name,
+         &quot;Away Team&quot; = away_team_id,
+         &quot;Away Starter&quot; = visitor_starting_pitcher_name) %&gt;%
+  kableExtra::kable() %&gt;% 
+  kableExtra::kable_styling() %&gt;% 
+  kableExtra::scroll_box(height = &quot;500px&quot;)</code></pre>
+<div style="border: 1px solid #ddd; padding: 0px; overflow-y: scroll; height:500px; ">
+<table class="table" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
+Date
+</th>
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
+Home Team
+</th>
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
+Home Starter
+</th>
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
+Away Team
+</th>
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
+Away Starter
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+2020-09-20
+</td>
+<td style="text-align:left;">
+SEA
+</td>
+<td style="text-align:left;">
+Justin Dunn
+</td>
+<td style="text-align:left;">
+SDN
+</td>
+<td style="text-align:left;">
+Dinelson Lamet
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2020-09-10
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Sean Manaea
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Jose Urquidy
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2020-08-18
+</td>
+<td style="text-align:left;">
+MIN
+</td>
+<td style="text-align:left;">
+Kenta Maeda
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Corbin Burnes
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2019-04-04
+</td>
+<td style="text-align:left;">
+NYN
+</td>
+<td style="text-align:left;">
+Noah Syndergaard
+</td>
+<td style="text-align:left;">
+WAS
+</td>
+<td style="text-align:left;">
+Stephen Strasburg
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2019-03-28
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Marcus Stroman
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Jordan Zimmermann
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2018-08-22
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Thomas Pannone
+</td>
+<td style="text-align:left;">
+BAL
+</td>
+<td style="text-align:left;">
+David Hess
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2018-08-03
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Brett Anderson
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Blaine Hardy
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2018-05-06
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Domingo German
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Mike Clevinger
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2017-08-20
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Justin Verlander
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Kenta Maeda
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2016-05-30
+</td>
+<td style="text-align:left;">
+ANA
+</td>
+<td style="text-align:left;">
+Jhoulys Chacin
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Justin Verlander
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2015-07-29
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Chris Archer
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Justin Verlander
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2015-06-24
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Nathan Karns
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Marco Estrada
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2014-08-02
+</td>
+<td style="text-align:left;">
+NYN
+</td>
+<td style="text-align:left;">
+Jacob deGrom
+</td>
+<td style="text-align:left;">
+SFN
+</td>
+<td style="text-align:left;">
+Jake Peavy
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2014-04-17
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Chris Sale
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Jon Lester
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2014-04-02
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Matt Garza
+</td>
+<td style="text-align:left;">
+ATL
+</td>
+<td style="text-align:left;">
+Aaron Harang
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2012-04-07
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Ubaldo Jimenez
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Brandon Morrow
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2011-06-24
+</td>
+<td style="text-align:left;">
+PHI
+</td>
+<td style="text-align:left;">
+Vance Worley
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Guillermo Moscoso
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2011-04-24
+</td>
+<td style="text-align:left;">
+FLO
+</td>
+<td style="text-align:left;">
+Josh Johnson
+</td>
+<td style="text-align:left;">
+COL
+</td>
+<td style="text-align:left;">
+Ubaldo Jimenez
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2011-04-13
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Kevin Correia
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Shaun Marcum
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2010-10-01
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Travis Wood
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Mark Rogers
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2010-08-01
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Gavin Floyd
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Gio Gonzalez
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2010-07-26
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Matt Garza
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Max Scherzer
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2010-06-13
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Ted Lilly
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Gavin Floyd
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2009-05-25
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Yovani Gallardo
+</td>
+<td style="text-align:left;">
+SLN
+</td>
+<td style="text-align:left;">
+Chris Carpenter
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2008-07-09
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Derek Lowe
+</td>
+<td style="text-align:left;">
+ATL
+</td>
+<td style="text-align:left;">
+Tim Hudson
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2007-08-21
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Jair Jurrjens
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Fausto Carmona
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2007-05-13
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Shaun Marcum
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Jae Weong Seo
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2006-09-25
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Shaun Marcum
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Tim Wakefield
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2006-05-08
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Roy Halladay
+</td>
+<td style="text-align:left;">
+ANA
+</td>
+<td style="text-align:left;">
+Jeff Weaver
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2006-05-07
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Casey Janssen
+</td>
+<td style="text-align:left;">
+ANA
+</td>
+<td style="text-align:left;">
+John Lackey
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2003-06-18
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Roger Clemens
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Victor Zambrano
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2002-08-22
+</td>
+<td style="text-align:left;">
+BAL
+</td>
+<td style="text-align:left;">
+John Stephens
+</td>
+<td style="text-align:left;">
+TBA
+</td>
+<td style="text-align:left;">
+Jorge Sosa
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2001-08-04
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Roy Oswalt
+</td>
+<td style="text-align:left;">
+MON
+</td>
+<td style="text-align:left;">
+Tomo Ohka
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2000-07-29
+</td>
+<td style="text-align:left;">
+MIN
+</td>
+<td style="text-align:left;">
+Eric Milton
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Roger Clemens
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1997-07-27
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Pat Hentgen
+</td>
+<td style="text-align:left;">
+KCA
+</td>
+<td style="text-align:left;">
+Jose Rosado
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1997-06-10
+</td>
+<td style="text-align:left;">
+SFN
+</td>
+<td style="text-align:left;">
+William VanLandingham
+</td>
+<td style="text-align:left;">
+FLO
+</td>
+<td style="text-align:left;">
+Kevin Brown
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1996-05-01
+</td>
+<td style="text-align:left;">
+NYN
+</td>
+<td style="text-align:left;">
+Mark Clark
+</td>
+<td style="text-align:left;">
+MON
+</td>
+<td style="text-align:left;">
+Pedro Martinez
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1994-07-28
+</td>
+<td style="text-align:left;">
+SDN
+</td>
+<td style="text-align:left;">
+Bill Krueger
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Erik Hanson
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1994-04-09
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Jimmy Key
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Mike Moore
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1993-05-22
+</td>
+<td style="text-align:left;">
+KCA
+</td>
+<td style="text-align:left;">
+Kevin Appier
+</td>
+<td style="text-align:left;">
+SEA
+</td>
+<td style="text-align:left;">
+Jim Converse
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1992-05-12
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Jimmy Jones
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Mike Morgan
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1991-07-28
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Mike Morgan
+</td>
+<td style="text-align:left;">
+MON
+</td>
+<td style="text-align:left;">
+Dennis Martinez
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1991-06-18
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Frank Tanana
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Bob Welch
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1991-06-12
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Mike Moore
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Frank Tanana
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1990-07-01
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Greg Hibbard
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Andy Hawkins
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1988-09-16
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Tom Browning
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Tim Belcher
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1987-09-27
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Rick Honeycutt
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Dave LaPoint
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1986-06-27
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Chris Codiroli
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Neil Allen
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1986-06-24
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Eric King
+</td>
+<td style="text-align:left;">
+BAL
+</td>
+<td style="text-align:left;">
+Scott McGregor
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1986-06-17
+</td>
+<td style="text-align:left;">
+MIL
+</td>
+<td style="text-align:left;">
+Danny Darwin
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Jimmy Key
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1984-05-20
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Jose DeLeon
+</td>
+<td style="text-align:left;">
+ATL
+</td>
+<td style="text-align:left;">
+Len Barker
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1983-08-19
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Alejandro Pena
+</td>
+<td style="text-align:left;">
+PHI
+</td>
+<td style="text-align:left;">
+Steve Carlton
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1983-05-27
+</td>
+<td style="text-align:left;">
+SDN
+</td>
+<td style="text-align:left;">
+Eric Show
+</td>
+<td style="text-align:left;">
+NYN
+</td>
+<td style="text-align:left;">
+Tom Seaver
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1980-07-13
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Steve Trout
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Rudy May
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1980-04-30
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Jesse Jefferson
+</td>
+<td style="text-align:left;">
+KCA
+</td>
+<td style="text-align:left;">
+Larry Gura
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1979-09-03
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Joe Niekro
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Jerry Reuss
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1979-04-07
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Rick Waits
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Mike Torrez
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1978-07-23
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Don Sutton
+</td>
+<td style="text-align:left;">
+SLN
+</td>
+<td style="text-align:left;">
+Pete Vuckovich
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1978-06-16
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Tom Seaver
+</td>
+<td style="text-align:left;">
+SLN
+</td>
+<td style="text-align:left;">
+John Denny
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1977-06-09
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Bill Bonham
+</td>
+<td style="text-align:left;">
+SFN
+</td>
+<td style="text-align:left;">
+Ed Halicki
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1977-06-08
+</td>
+<td style="text-align:left;">
+CAL
+</td>
+<td style="text-align:left;">
+Nolan Ryan
+</td>
+<td style="text-align:left;">
+TOR
+</td>
+<td style="text-align:left;">
+Jesse Jefferson
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1976-06-23
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+J.R. Richard
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Rick Rhoden
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1976-06-07
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Bruce Kison
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Jack Billingham
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1974-07-13
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Wilbur Wood
+</td>
+<td style="text-align:left;">
+BAL
+</td>
+<td style="text-align:left;">
+Mike Cuellar
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1973-09-26
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Catfish Hunter
+</td>
+<td style="text-align:left;">
+MIN
+</td>
+<td style="text-align:left;">
+Bert Blyleven
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1973-08-19
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Rick Reuschel
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Tommy John
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1973-08-03
+</td>
+<td style="text-align:left;">
+CAL
+</td>
+<td style="text-align:left;">
+Bill Singer
+</td>
+<td style="text-align:left;">
+OAK
+</td>
+<td style="text-align:left;">
+Vida Blue
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1973-06-12
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Ken Forsch
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Rick Reuschel
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1972-07-27
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Stan Bahnsen
+</td>
+<td style="text-align:left;">
+KCA
+</td>
+<td style="text-align:left;">
+Roger Nelson
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1971-09-22
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Mike Garman
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Mickey Lolich
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1971-04-13
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Tom Bradley
+</td>
+<td style="text-align:left;">
+CAL
+</td>
+<td style="text-align:left;">
+Andy Messersmith
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1968-05-07
+</td>
+<td style="text-align:left;">
+ATL
+</td>
+<td style="text-align:left;">
+Dick Kelley
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Al McBean
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1967-08-16
+</td>
+<td style="text-align:left;">
+WS2
+</td>
+<td style="text-align:left;">
+Camilo Pascual
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Steve Hargan
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1965-09-19
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Bob Veale
+</td>
+<td style="text-align:left;">
+PHI
+</td>
+<td style="text-align:left;">
+Chris Short
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1965-09-09
+</td>
+<td style="text-align:left;">
+LAN
+</td>
+<td style="text-align:left;">
+Sandy Koufax
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Bob Hendley
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1965-07-09
+</td>
+<td style="text-align:left;">
+CAL
+</td>
+<td style="text-align:left;">
+George Brunet
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Ralph Terry
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1964-09-11
+</td>
+<td style="text-align:left;">
+MLN
+</td>
+<td style="text-align:left;">
+Denny Lemaster
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Jim Maloney
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1963-09-05
+</td>
+<td style="text-align:left;">
+SFN
+</td>
+<td style="text-align:left;">
+Bobby Bolin
+</td>
+<td style="text-align:left;">
+HOU
+</td>
+<td style="text-align:left;">
+Don Nottebart
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1963-08-10
+</td>
+<td style="text-align:left;">
+LAA
+</td>
+<td style="text-align:left;">
+Dean Chance
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Whitey Ford
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1963-07-16
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Bob Buhl
+</td>
+<td style="text-align:left;">
+MLN
+</td>
+<td style="text-align:left;">
+Bob Sadowski
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1959-07-17
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Ralph Terry
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Early Wynn
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1959-06-18
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Moe Drabowsky
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Ron Kline
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1959-04-10
+</td>
+<td style="text-align:left;">
+PHI
+</td>
+<td style="text-align:left;">
+Robin Roberts
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Don Newcombe
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1956-07-04
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Paul Foytack
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Herb Score
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1955-09-07
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Whitey Ford
+</td>
+<td style="text-align:left;">
+KC1
+</td>
+<td style="text-align:left;">
+Arnie Portocarrero
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1955-06-01
+</td>
+<td style="text-align:left;">
+KC1
+</td>
+<td style="text-align:left;">
+Ray Herbert
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Johnny Kucks
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1954-06-09
+</td>
+<td style="text-align:left;">
+WS1
+</td>
+<td style="text-align:left;">
+Bob Porterfield
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Mike Garcia
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1953-07-10
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Billy Pierce
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Bob Feller
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1952-05-15
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Virgil Trucks
+</td>
+<td style="text-align:left;">
+WS1
+</td>
+<td style="text-align:left;">
+Bob Porterfield
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1951-07-12
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Bob Feller
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Allie Reynolds
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1947-06-22
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Ewell Blackwell
+</td>
+<td style="text-align:left;">
+BRO
+</td>
+<td style="text-align:left;">
+Joe Hatten
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1944-09-16
+</td>
+<td style="text-align:left;">
+BSN
+</td>
+<td style="text-align:left;">
+Red Barrett
+</td>
+<td style="text-align:left;">
+BRO
+</td>
+<td style="text-align:left;">
+Chink Zachary
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1944-08-06
+</td>
+<td style="text-align:left;">
+PHA
+</td>
+<td style="text-align:left;">
+Jesse Flores
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Monk Dubiel
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1944-05-17
+</td>
+<td style="text-align:left;">
+PHA
+</td>
+<td style="text-align:left;">
+Bobo Newsom
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Dizzy Trout
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1942-04-19
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Claude Passeau
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Paul Derringer
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1941-09-13
+</td>
+<td style="text-align:left;">
+SLN
+</td>
+<td style="text-align:left;">
+Mort Cooper
+</td>
+<td style="text-align:left;">
+BRO
+</td>
+<td style="text-align:left;">
+Whit Wyatt
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1939-07-08
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Marius Russo
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Denny Galehouse
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1936-09-01
+</td>
+<td style="text-align:left;">
+PHA
+</td>
+<td style="text-align:left;">
+Red Bullock
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Schoolboy Rowe
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1934-05-28
+</td>
+<td style="text-align:left;">
+NY1
+</td>
+<td style="text-align:left;">
+Hal Schumacher
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Larry French
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1933-07-20
+</td>
+<td style="text-align:left;">
+WS1
+</td>
+<td style="text-align:left;">
+General Crowder
+</td>
+<td style="text-align:left;">
+DET
+</td>
+<td style="text-align:left;">
+Tommy Bridges
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1931-09-21
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Ed Morris
+</td>
+<td style="text-align:left;">
+SLA
+</td>
+<td style="text-align:left;">
+Sam Gray
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1927-09-17
+</td>
+<td style="text-align:left;">
+PHA
+</td>
+<td style="text-align:left;">
+Eddie Rommel
+</td>
+<td style="text-align:left;">
+SLA
+</td>
+<td style="text-align:left;">
+Sad Sam Jones
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1927-08-11
+</td>
+<td style="text-align:left;">
+SLN
+</td>
+<td style="text-align:left;">
+Pete Alexander
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Vic Aldridge
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1926-09-06
+</td>
+<td style="text-align:left;">
+CIN
+</td>
+<td style="text-align:left;">
+Jakie May
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+Charlie Root
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1925-08-15
+</td>
+<td style="text-align:left;">
+NY1
+</td>
+<td style="text-align:left;">
+Virgil Barnes
+</td>
+<td style="text-align:left;">
+BRO
+</td>
+<td style="text-align:left;">
+Dazzy Vance
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1924-04-15
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Howard Ehmke
+</td>
+<td style="text-align:left;">
+NYA
+</td>
+<td style="text-align:left;">
+Bob Shawkey
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1919-08-10
+</td>
+<td style="text-align:left;">
+WS1
+</td>
+<td style="text-align:left;">
+Jim Shaw
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Eddie Cicotte
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1918-06-05
+</td>
+<td style="text-align:left;">
+CLE
+</td>
+<td style="text-align:left;">
+Johnny Enzmann
+</td>
+<td style="text-align:left;">
+BOS
+</td>
+<td style="text-align:left;">
+Bullet Joe Bush
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1918-05-11
+</td>
+<td style="text-align:left;">
+PHA
+</td>
+<td style="text-align:left;">
+Scott Perry
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Frank Shellenback
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1916-07-20
+</td>
+<td style="text-align:left;">
+WS1
+</td>
+<td style="text-align:left;">
+Harry Harper
+</td>
+<td style="text-align:left;">
+CHA
+</td>
+<td style="text-align:left;">
+Reb Russell
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1916-04-23
+</td>
+<td style="text-align:left;">
+CHN
+</td>
+<td style="text-align:left;">
+George McConnell
+</td>
+<td style="text-align:left;">
+PIT
+</td>
+<td style="text-align:left;">
+Erv Kantlehner
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>There are 111 combined half no-hitters in the database, which is about half the number of true no-hitters. The below chart shows the number of no-hitters of each type for each season going back to 1970.</p>
+<pre class="r"><code>nohit_real &lt;- pbp %&gt;% 
+  group_by(game_id, away_team_id, bat_home_id) %&gt;% 
+  filter(max(inn_ct) &gt;= 8) %&gt;% 
+  summarize(n_hits = sum(event_cd %in% 20:23, na.rm = TRUE)) %&gt;% 
+  ungroup() %&gt;% 
+  filter(n_hits == 0) %&gt;% 
+  arrange(desc(as.numeric(substr(game_id, 4,11))))
+
+ggplot() +
+  geom_line(nohit %&gt;% ungroup() %&gt;% count(year = as.numeric(substr(game_id,4,7))) %&gt;% complete(year = 1916:2020, fill = list(n=0)), mapping = aes(x=year, y = n, col = &quot;4.5 Inning&quot;), na.rm = TRUE) +
+  geom_point(nohit %&gt;% ungroup() %&gt;% count(year = as.numeric(substr(game_id,4,7))) %&gt;% complete(year = 1916:2020, fill = list(n=0)), mapping = aes(x=year, y = n, col = &quot;4.5 Inning&quot;), na.rm = TRUE) +
+  geom_line(nohit_real %&gt;% ungroup() %&gt;% count(year = as.numeric(substr(game_id,4,7))) %&gt;% complete(year = 1916:2020, fill = list(n=0)), mapping = aes(x=year, y = n, col = &quot;Regular&quot;), na.rm = TRUE) +
+  geom_point(nohit_real %&gt;% ungroup() %&gt;% count(year = as.numeric(substr(game_id,4,7))) %&gt;% complete(year = 1916:2020, fill = list(n=0)), mapping = aes(x=year, y = n, col = &quot;Regular&quot;), na.rm = TRUE) +
+  theme_light() +
+  xlim(c(1970,2020)) +
+  labs(x= &quot;Year&quot;, y = &quot;Number of Games&quot;,
+       col = &quot;No-Hitter Type&quot;)</code></pre>
+<p><img src="/blog/2020-12-23-combined-half-no-hitters_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>In the episode, Ben Lindbergh and Sam Miller talked about why there are about half as many of these combined half no-hitters as there are regular no-hitters. My theory is that in each game, there are two opportunities for a regular no-hitter (one for the home team, one for the away team), but only one opportunity for a combined half no-hitter.</p>

@@ -6,7 +6,17 @@
     <description>Recent content on Adam Ott</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-US</language>
-    <lastBuildDate>Tue, 22 Dec 2020 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 23 Dec 2020 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Combined Half No-Hitters</title>
+      <link>/blog/combined-half-no-hitters/</link>
+      <pubDate>Wed, 23 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/combined-half-no-hitters/</guid>
+      <description>In August 2020 on Episode 1580 of “Effectively Wild”, there was a discussion about “Combined Half No-Hitters”, where neither team allows a hit through 4.5 innings, leading to 9 total half-innings without a hit. I did the queries in my Retrosheet database to find a list of every combined half no-hitter.
+To look this up, I first read in attached my R session to my PostgreSQL database using the “dbcon.</description>
+    </item>
+    
     <item>
       <title>A Bayesian Approach to Catcher Framing</title>
       <link>/blog/a-bayesian-approach-to-catcher-framing/</link>
@@ -32,7 +42,7 @@
       
       <guid>/about/</guid>
       <description>I am a Statistics Master&amp;rsquo;s student at Brigham Young University. I enjoy sports, singing, and spending time with my family.
-I have previously interned as an Analyst at Energy Exemplar and a Data Scientist. Currently, I do research and work as a teaching assistant at BYU. I have also done research for &amp;ldquo;Effectively Wild&amp;rdquo;, a FanGraphs baseball podcast.</description>
+I have previously interned as an Analyst at Energy Exemplar and a Data Scientist at UnitedHealth Group. Currently, I do research and work as a teaching assistant at BYU. I have also done research for &amp;ldquo;Effectively Wild&amp;rdquo;, a FanGraphs baseball podcast.</description>
     </item>
     
   </channel>
