@@ -4,12 +4,17 @@
   
   <url>
     <loc>/</loc>
-    <lastmod>2020-12-23T00:00:00+00:00</lastmod>
+    <lastmod>2020-12-24T00:00:00+00:00</lastmod>
   </url>
   
   <url>
     <loc>/blog/</loc>
-    <lastmod>2020-12-23T00:00:00+00:00</lastmod>
+    <lastmod>2020-12-24T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/clustering-hitters-by-their-distribution-of-batted-balls/</loc>
+    <lastmod>2020-12-24T00:00:00+00:00</lastmod>
   </url>
   
   <url>

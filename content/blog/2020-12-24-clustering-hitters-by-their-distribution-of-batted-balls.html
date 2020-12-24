@@ -1,0 +1,226 @@
+---
+title: Clustering Hitters by their Distribution of Batted Balls
+author: ~
+date: '2020-12-24'
+slug: clustering-hitters-by-their-distribution-of-batted-balls
+categories: []
+tags: []
+comments: no
+showcomments: yes
+showpagemeta: yes
+---
+
+
+
+<p>Grouping similar baseball players is essential to teams. It could allow a larger sample size when predicting batter vs. pitcher matchups or reduce the amount of information needed on a scouting report.</p>
+<p>There are a variety of possible metrics by which to cluster hitters, but I will focus on just two: the exit velocity and launch angle of their batted balls. I focus on these two characteristics of batted balls because by knowing a ball’s exit velocity and launch angle, you know what the probable result of the play is.</p>
+<p>Because a batter will hit hundreds of balls throughout the season, each with their own exit velocity and launch angle, it can be tricky to summarize the information in a way that is useful for producing clusters. I could sample statistics, such as max exit velocity, average exit velocity, average launch angle, or proportion of batted balls that fall in a certain range of exit velocity and launch angle, but these numbers fail to capture the complexity that is a batter’s entire distribution of batted balls. For example, the below figure shows the bivariate distribution of exit velocity and launch angle for four players, as well as their average exit velocity and launch angle (the red dot). Although the four players vary in the hitting style and prowess, the difference between their averages is much less stark than the difference between their distributions.</p>
+<pre class="r"><code>library(MASS)
+library(tidyverse)
+source(&quot;dbcon.R&quot;)
+set.seed(101)
+in_play &lt;- dbGetQuery(con, &quot;select * from bayes_project&quot;)
+
+in_play &lt;- in_play %&gt;% 
+  dplyr::select(player_name, launch_speed, launch_angle) %&gt;% 
+  na.omit() 
+
+ggplot() +
+  geom_density2d_filled(in_play %&gt;% 
+                          filter(player_name %in% c(&quot;Mike Trout&quot;,
+                                                    &quot;Omar Narvaez&quot;,
+                                                    &quot;Freddie Freeman&quot;,
+                                                    &quot;David Dahl&quot;)),
+                        mapping = aes(x=launch_speed,
+                                      y = launch_angle), 
+                        bins = 50, alpha = .8, na.rm = TRUE) +
+  geom_point(in_play %&gt;% 
+                group_by(player_name) %&gt;% 
+                filter(player_name %in% c(&quot;Mike Trout&quot;, &quot;Omar Narvaez&quot;,
+                            &quot;Freddie Freeman&quot;, &quot;David Dahl&quot;)) %&gt;% 
+                 summarize(mean_ev = mean(launch_speed),
+                           mean_la = mean(launch_angle)),
+               mapping = aes(x = mean_ev, y = mean_la), col = &quot;red&quot;, size = 4, na.rm = TRUE) + 
+  facet_wrap(~player_name) +
+  theme_light() +
+  theme(legend.position = &quot;none&quot;) +
+  labs(x = &quot;Exit Velocity&quot;, y = &quot;Launch Angle&quot;, title = &quot;Distributions vs. Means&quot;) +
+  scale_x_continuous(limits = c(50, 120)) +
+  scale_y_continuous(limits = c(-60,60))</code></pre>
+<p><img src="/blog/2020-12-24-clustering-hitters-by-their-distribution-of-batted-balls_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
+<p>The idea behind clustering is to group similar things together and separate dissimilar things. In this case, I want to group hitters with similar batted ball distributions together. There are two problems with this. First, I need to approximate the distribution of batted balls for each player. This distribution will be irregular, so I will use 2-D kernel density estimation at a fine grid of points after standardizing the data.</p>
+<pre class="r"><code>in_play &lt;- in_play %&gt;% 
+  group_by(player_name) %&gt;% 
+  filter(n() &gt;= 100) %&gt;% 
+  ungroup()
+
+mean_ev &lt;- mean(in_play$launch_speed)
+sd_ev &lt;- sd(in_play$launch_speed)
+mean_la &lt;- mean(in_play$launch_angle)
+sd_la &lt;- sd(in_play$launch_angle)
+
+in_play &lt;- in_play %&gt;% 
+  mutate(launch_speed = (launch_speed-mean_ev)/sd_ev,
+         launch_angle = (launch_angle-mean_la)/sd_la)
+
+#for(k in 1:100){
+players &lt;- sort(unique(in_play$player_name))
+
+get_density_estimate &lt;- function(i){
+  dat &lt;- in_play %&gt;% 
+    filter(player_name == players[i]) %&gt;% 
+    dplyr::select(launch_speed, launch_angle)
+  
+  dens &lt;- kde2d(dat$launch_speed, dat$launch_angle, n = 50, lims = c(-4,4,-4,4))$z %&gt;% 
+    as.vector()
+  
+  dens
+}
+
+
+dists &lt;- sapply(1:length(players), get_density_estimate)</code></pre>
+<p>The second issue is in defining a distance/similarity metric for entire distributions. I will use a modified version of Kullback-Leibler (KL) divergence. For continuous distributions <span class="math inline">\(P\)</span> and <span class="math inline">\(Q\)</span> with densities <span class="math inline">\(p(x)\)</span> and <span class="math inline">\(q(x)\)</span> respectively, the KL divergence is defined as
+<span class="math display">\[D(P|Q) = \int_{-\infty}^{\infty} p(x) \text{log}\left(\frac{p(x)}{q(x)}\right)dx.\]</span></p>
+<p>Because there is no known equation for the continuous probability density function of each distribution, but instead there are density estimates at <span class="math inline">\(N\)</span> locations, <span class="math inline">\(a_1,...,a_{N}\)</span>, an adjustment must be made. Since the grid with the locations of the density estimates is the same for each distribution (ensuring the densities are on the same scale), I will adjust to
+<span class="math display">\[D(P|Q) = \sum_{i=1}^{N} p(a_i) \text{log}\left(\frac{p(a_i)}{q(a_i)}\right).\]</span></p>
+<p>KL divergence is not a symmetric measure, so to incorporate it into the clustering algorithm, I instead use <span class="math inline">\(d(P,Q) = D(P|Q) + D(Q|P)\)</span>.</p>
+<p>After approximating the distribution for each player and calculating the distances between each distribution, I can check to see which players are closest together. For example, below I show the five players with the closest batted ball distribution to Mike Trout.</p>
+<pre class="r"><code>dist_mat &lt;- matrix(NA, length(players), length(players))
+for(i in 1:length(players)){
+  for(j in 1:length(players)){
+    if(i != j){
+      dist_mat[i,j] &lt;- sum(dists[,i]*log(dists[,i]/dists[,j])) +
+        sum(dists[,j]*log(dists[,j]/dists[,i]))
+    }
+  }
+}
+
+colnames(dist_mat) &lt;- players
+rownames(dist_mat) &lt;- players
+
+dist_mat[&quot;Mike Trout&quot;,] %&gt;% 
+  sort() %&gt;% 
+  head(5)</code></pre>
+<pre><code>##   Trevor Story Alex Dickerson   Brandon Belt  Nolan Arenado     Will Smith 
+##       7.703614       9.064337       9.613870       9.784453      10.182298</code></pre>
+<p>Using the distances between all pairs of distributions, I use an agglomerative clustering algorithm to put the distributions into clusters, grouping the clusters that are closest together in an iterative process. Starting with <span class="math inline">\(n\)</span> clusters (with one player per cluster), I combine the two clusters that have the smallest distance between them to form <span class="math inline">\(n-1\)</span> clusters. I then combins the two closest clusters and repeat the process until reaching the desired number of clusters. Because I have the distance between distributions, rather than between clusters, I use Ward’s linkage to combine the clusters. Ward’s linkage combines clusters to minimize the total sum of squares error (squared distance from each distribution to its cluster mean). For this project, I arbitrarily stop at 20 clusters because it seems like a reasonable number of batted ball profiles to exist.</p>
+<pre class="r"><code>dc &lt;- dist(dist_mat)
+wardlink &lt;- hclust(dc,method=&#39;ward.D2&#39;)
+kl_clusters &lt;- cutree(wardlink,20) %&gt;%
+  as.data.frame() %&gt;% 
+  rownames_to_column(&quot;player&quot;) %&gt;% 
+  rename(player_name = player, cluster = &#39;.&#39;) %&gt;% 
+  arrange(cluster)</code></pre>
+<p>Describing the 20 clusters is a bit of a challenge. One way to do it is to show where the players in each cluster fall in certain outcome statistics. Below, using data obtained from FanGraphs, I show where players in each of the 20 clusters fall in Batting Average on Balls in Play, or BABIP, and in Home Runs per Fly Ball (HR/FB). I chose to display these two statistics because they represent the ability to hit for average and power, two traditional hitting tools. I also highlight some of the more notable players in baseball.</p>
+<pre class="r"><code>advanced &lt;- read.csv(&quot;advanced_2020.csv&quot;)
+batted_ball &lt;- read.csv(&quot;batted_ball_2020.csv&quot;)
+statcast &lt;- read.csv(&quot;statcast_2020.csv&quot;)
+
+advanced &lt;- advanced %&gt;% 
+  janitor::clean_names() %&gt;% 
+  mutate(bb = as.numeric(str_remove(bb, &quot;%&quot;)),
+         k = as.numeric(str_remove(k, &quot;%&quot;))) %&gt;% 
+  dplyr::select(player_name = i_name,
+         bb_perc = bb,
+         k_perc = k,
+         avg,
+         obp,
+         slg,
+         babip,
+         woba = w_oba,
+         wrc_plus = w_rc_2
+         ) %&gt;% 
+  mutate(player_name = case_when(player_name == &quot;Giovanny Urshela&quot; ~ &quot;Gio Urshela&quot;,
+                                 player_name == &quot;A.J. Pollock&quot; ~ &quot;AJ Pollock&quot;,
+                                 player_name == &quot;Shed Long&quot; ~ &quot;Shed Long Jr.&quot;,
+                                 player_name == &quot;Yoshitomo Tsutsugo&quot; ~ &quot;Yoshi Tsutsugo&quot;,
+                                 player_name == &quot;Cedric Mullins II&quot; ~ &quot;Cedric Mullins&quot;,
+                                 player_name == &quot;Dee Gordon&quot; ~ &quot;Dee Strange-Gordon&quot;,
+                                 player_name == &quot;D.J. Stewart&quot; ~ &quot;DJ Stewart&quot;,
+                                 player_name == &quot;Nicholas Castellanos&quot; ~ &quot;Nick Castellanos&quot;,
+                                 TRUE ~ player_name))
+
+batted_ball &lt;- batted_ball %&gt;% 
+  janitor::clean_names() %&gt;% 
+  mutate(gb = as.numeric(str_remove(gb, &quot;%&quot;)),
+         fb = as.numeric(str_remove(fb, &quot;%&quot;)),
+         hr_fb = as.numeric(str_remove(hr_fb, &quot;%&quot;)),
+         ifh_2 = as.numeric(str_remove(ifh_2, &quot;%&quot;)),
+         pull = as.numeric(str_remove(pull, &quot;%&quot;)),
+         oppo = as.numeric(str_remove(oppo, &quot;%&quot;)),
+         soft = as.numeric(str_remove(soft, &quot;%&quot;)),
+         hard = as.numeric(str_remove(hard, &quot;%&quot;))) %&gt;% 
+  dplyr::select(player_name = i_name,
+         gb, fb, hr_fb, inf_h = ifh_2, pull, oppo, soft, hard) %&gt;% 
+  mutate(player_name = case_when(player_name == &quot;Giovanny Urshela&quot; ~ &quot;Gio Urshela&quot;,
+                                 player_name == &quot;A.J. Pollock&quot; ~ &quot;AJ Pollock&quot;,
+                                 player_name == &quot;Shed Long&quot; ~ &quot;Shed Long Jr.&quot;,
+                                 player_name == &quot;Yoshitomo Tsutsugo&quot; ~ &quot;Yoshi Tsutsugo&quot;,
+                                 player_name == &quot;Cedric Mullins II&quot; ~ &quot;Cedric Mullins&quot;,
+                                 player_name == &quot;Dee Gordon&quot; ~ &quot;Dee Strange-Gordon&quot;,
+                                 player_name == &quot;D.J. Stewart&quot; ~ &quot;DJ Stewart&quot;,
+                                 player_name == &quot;Nicholas Castellanos&quot; ~ &quot;Nick Castellanos&quot;,
+                                 TRUE ~ player_name)) %&gt;% 
+  mutate(player_name = case_when(player_name == &quot;Giovanny Urshela&quot; ~ &quot;Gio Urshela&quot;,
+                                 player_name == &quot;A.J. Pollock&quot; ~ &quot;AJ Pollock&quot;,
+                                 player_name == &quot;Shed Long&quot; ~ &quot;Shed Long Jr.&quot;,
+                                 player_name == &quot;Yoshitomo Tsutsugo&quot; ~ &quot;Yoshi Tsutsugo&quot;,
+                                 player_name == &quot;Cedric Mullins II&quot; ~ &quot;Cedric Mullins&quot;,
+                                 player_name == &quot;Dee Gordon&quot; ~ &quot;Dee Strange-Gordon&quot;,
+                                 player_name == &quot;D.J. Stewart&quot; ~ &quot;DJ Stewart&quot;,
+                                 player_name == &quot;Nicholas Castellanos&quot; ~ &quot;Nick Castellanos&quot;,
+                                 TRUE ~ player_name))
+
+
+
+kl_plot &lt;- kl_clusters %&gt;% 
+  left_join(advanced, by = &quot;player_name&quot;) %&gt;% 
+  left_join(batted_ball, by = &quot;player_name&quot;) %&gt;% 
+  na.omit() %&gt;% 
+  mutate(keep_name = ifelse(player_name %in% c(&quot;Mike Trout&quot;, &quot;Freddie Freeman&quot;, 
+                                               &quot;Fernando Tatis Jr.&quot;, &quot;Mookie Betts&quot;,
+                                               &quot;Aaron Judge&quot;, &quot;Jose Abreu&quot;, &quot;Manny Machado&quot;,
+                                               &quot;DJ LeMahieu&quot;, &quot;Nelson Cruz&quot;, &quot;Tim Anderson&quot;,
+                                               &quot;Juan Soto&quot;, &quot;Marcell Ozuna&quot;, &quot;Trea Turner&quot;,
+                                               &quot;Bryce Harper&quot;, &quot;Ronald Acuna&quot;),
+                            TRUE, FALSE)) %&gt;% 
+  mutate(avg_babip = mean(babip),
+         avg_hr_fb = mean(hr_fb)/100) 
+
+
+ggplot() +
+  geom_point(filter(kl_plot, !keep_name), mapping = aes(x=babip, y = hr_fb/100), alpha = .5) +
+  geom_point(filter(kl_plot, keep_name) %&gt;% arrange(player_name), mapping = aes(x=babip, y = hr_fb/100,
+                                                       fill = player_name, shape = player_name), size = 4, alpha = .8) +
+  geom_vline(xintercept = kl_plot$avg_babip[1]) +
+  geom_hline(yintercept = kl_plot$avg_hr_fb[1]) +
+  scale_shape_manual(name = &quot;Player&quot;, values = c(21:25,21:25,21:25),
+                     labels = filter(kl_plot, keep_name) %&gt;% arrange(player_name) %&gt;%  pull(player_name)) +
+  scale_fill_manual(name = &quot;Player&quot;, values = c(2:8, 10:16),
+                    labels = filter(kl_plot, keep_name) %&gt;% arrange(player_name) %&gt;% pull(player_name)) +
+  #guides(colour = guide_legend(override.aes = list(shape = override.shape, fill = override.fill)))
+  facet_wrap(~cluster) +
+  theme_light() +
+  labs(x = &quot;BABIP&quot;, y = &quot;HR/FB&quot;) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 2)) +
+  scale_x_continuous(breaks = c(&quot;.200&quot; = .2, &quot;.300&quot;= .3, &quot;.400&quot; = .4)) +
+  theme(text = element_text(size = 12))</code></pre>
+<p><img src="/blog/2020-12-24-clustering-hitters-by-their-distribution-of-batted-balls_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>Of note, cluster 2 contains 4 of these notable players and has players with good ability to hit for average and great ability to hit for power. Judging by the players in the cluster and their results, the distributions of launch angle and exit velocity that make up this cluster must be close to ideal. Other notable positive clusters are clusters 8, 9, and 10, which each contain 2 of the most notable hitters in baseball. Clusters 18 and 19 contain some of the weaker hitters in baseball, players known largely for their defense, so the distributions that make up these clusters are not the optimal distributions of launch angle and exit velocity.</p>
+<p>The below plot shows the overall distributions for exit velocity and launch angle for all batted balls by all players in clusters 2, 10, 18, and 19. Clusters 2 and 10 have a region of high density near 15 degrees and over 100 MPH, believed to be the sweet spot for launch angle and exit velocity. If the players in these clusters consistently hit with that launch angle and exit velocity, it makes sense that they would make up the best hitters in baseball. Note that the region of high density for cluster 2 has a slightly higher exit velocity than that for cluster 10, explaining the slight difference in player quality between the two clusters. Cluster 18 also has a region of high density around 15 degrees, but closer to 95 MPH, which explains why some of the players in that cluster might have less success. These players don’t hit the ball as hard, so they have less power. Additionally, there is a bigger region of high density above 30 degrees, which usually leads to easy fly outs for the defense. Cluster 19 has its region of highest density above 30 degrees, explaining why the cluster contains some of the weakest hitters in baseball.</p>
+<pre class="r"><code>in_play %&gt;% 
+  left_join(kl_clusters, by = &quot;player_name&quot;) %&gt;%
+  mutate(launch_speed = launch_speed*sd_ev+mean_ev,
+         launch_angle = launch_angle*sd_la+mean_la) %&gt;% 
+  filter(cluster %in% c(2,10,18,19)) %&gt;% 
+  ggplot(aes(x=launch_speed, y = launch_angle)) +
+  geom_density2d_filled(bins = 50, alpha = .8) +
+  facet_wrap(~cluster) +
+  theme_light() +
+  theme(legend.position = &quot;none&quot;) +
+  labs(x = &quot;Exit Velocity&quot;, y = &quot;Launch Angle&quot;, title = &quot;Overall Distributions of Select Clusters&quot;) +
+  scale_x_continuous(limits = c(50, 120)) +
+  scale_y_continuous(limits = c(-60,60))</code></pre>
+<pre><code>## Warning: Removed 634 rows containing non-finite values (stat_density2d_filled).</code></pre>
+<p><img src="/blog/2020-12-24-clustering-hitters-by-their-distribution-of-batted-balls_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p>There are a variety of future applications for the clusters formed from this analysis. They could be used to have a larger sample size when predicting batter vs. pitcher matchups, to reduce the amount of information needed on a scouting report, or to identify underachieving players that belong to the same cluster as stars, prompting more work on their development.</p>
