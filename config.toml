@@ -21,7 +21,7 @@ enableRobotsTXT = true
 ## Site Settings
 [params]
 author = "Adam Ott"
-intro = "Data Scientist"
+intro = "sabe-R-metrics"
 description = "A data science blog that focuses on Sabermetrics with R"
 authorimage = "headshot.jpg"
 dateformat = "Jan 2, 2006"
