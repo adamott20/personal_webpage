@@ -6,7 +6,16 @@
     <description>Recent content on Adam Ott</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-US</language>
-    <lastBuildDate>Thu, 24 Dec 2020 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 02 Jan 2021 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Using Bivariate Poisson Regression to Calculate Park Effects, Home Field Advantage, and Team Effects</title>
+      <link>/blog/using-bivariate-poisson-regression-to-calculate-park-effects-home-field-advantage-and-team-effects/</link>
+      <pubDate>Sat, 02 Jan 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/using-bivariate-poisson-regression-to-calculate-park-effects-home-field-advantage-and-team-effects/</guid>
+      <description>I recently read a paper written by Luke Benz and Michael Lopez that estimated the change in home field advantage in soccer leagues around the world due to not having fans in the stands in 2020. In their paper, the used a Bayesian Bivariate Poisson regression model that included the effect of team offense and defense and the effect of being the home team both before and during the pandemic to explain goal scoring.</description>
+    </item>
+    
     <item>
       <title>Clustering Hitters by their Distribution of Batted Balls</title>
       <link>/blog/clustering-hitters-by-their-distribution-of-batted-balls/</link>
